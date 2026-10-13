@@ -3,8 +3,8 @@
   "network": "Arc Testnet",
   "usdc": "0x3600000000000000000000000000000000000000",
   "usdcDecimals": 6,
-  "taskForge": null,
-  "deployTxHash": null,
-  "deployBlock": null,
-  "note": "Not deployed yet. Fill taskForge, deployTxHash and deployBlock after a successful deployment."
+  "taskForge": "0x8C187118DCFefbeb706D627cC8feF81FD2d43cA9",
+  "deployTxHash": "0x42fc23b2044227ada3faf7f8d24c52f176a73519d3cef543933871dc57995afc",
+  "deployBlock": 67038677,
+  "note": "TaskForge successfully deployed on Arc Testnet."
 }

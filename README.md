@@ -1,153 +1,116 @@
 # Task Forge
 
-### An Onchain Task Marketplace Powered by Arc and USDC
+Task Forge is a small, non-custodial task marketplace for Arc Testnet. A task creator escrows ERC-20 USDC, contributors submit an offchain deliverable URL, the creator selects one submission, and the chosen contributor pulls the reward.
 
-Task Forge is a decentralized task marketplace built on **Arc**, designed to connect people who need work done with contributors who want to earn rewards.
+## Architecture
 
-Anyone can create a task, fund it with USDC, submit work, and receive payment through smart contracts.
+```text
+MetaMask / EVM wallet
+        │ approve + transact
+        ▼
+React + Vite + Wagmi ───────────────► Arc Testnet RPC
+        │                                      │
+        └──── read contract state ◄────────────┘
+                                               │
+                              ERC-20 USDC ──► TaskForge escrow
+                                               │
+              creator accepts ──► contributor reward credit
+              cancellation/expiry ──► creator refund credit
+                                               │
+                         contributor/creator pull their funds
+```
 
-From fixing GitHub issues and building software features to developing smart contracts, writing documentation, and creating developer tools, Task Forge makes it possible to coordinate digital work with transparent, onchain payments.
+## Contract model
 
-**Build something. Complete tasks. Earn USDC.**
+`TaskForge` holds one ERC-20 reward per task. The state machine is:
 
----
+```text
+Open → Awarded → Completed
+  ├──→ Cancelled  (creator; before deadline; no submissions)
+  └──→ Expired    (anyone; after deadline; no award)
+```
 
-## Overview
+Rewards and refunds are pull payments. Accepting moves the task reward to the accepted contributor's credit; cancellation or expiry moves it to the creator's refund credit. Only then can the entitled party withdraw. This ensures an expired/cancelled task cannot take a previously awarded reward.
 
-Traditional freelance platforms often rely on centralized payment systems, platform fees, and intermediaries.
+Financial invariants:
 
-Task Forge explores an alternative: a task marketplace where smart contracts manage reward funding, enforce payment rules, and make task-related transactions publicly verifiable.
+- Each funded task increases `totalEscrowed` exactly once.
+- A task can credit only one reward or one refund, never both.
+- Withdrawal changes state/credit before its ERC-20 transfer and is reentrancy-protected.
+- No function iterates over tasks or submissions in a state-changing transaction.
 
-The project uses Arc's EVM-compatible environment and USDC-based transactions to demonstrate how onchain infrastructure can support practical applications for developers and independent contributors.
+## Arc Testnet configuration
 
-### Key Features
+The checked settings are:
 
-* **Open Task Marketplace:** Create and discover tasks across multiple categories.
-* **USDC Rewards:** Fund tasks with USDC and pay contributors for accepted work.
-* **Onchain Escrow:** Lock task rewards in smart contracts until the applicable payment conditions are met.
-* **Transparent Payments:** Inspect transactions and contract activity on the Arc Testnet explorer.
-* **GitHub-Friendly Workflows:** Submit GitHub issues, pull requests, repositories, and other deliverable links.
-* **Wallet Integration:** Interact with the application through a compatible EVM wallet.
-* **Smart Contract Security:** Test authorization, payment accounting, withdrawal logic, and task state transitions.
-* **Open Source:** Provide a foundation for developers to extend and improve the marketplace.
+- Chain ID: `5042002`
+- RPC: `https://rpc.testnet.arc.network`
+- Explorer: `https://testnet.arcscan.app`
+- ERC-20 USDC: `0x3600000000000000000000000000000000000000`
+- USDC decimals: `6`
+- Faucet: [Circle Faucet](https://faucet.circle.com)
 
-> **Project status:** Experimental MVP targeting Arc Testnet. Features, deployment status, and security guarantees depend on the current implementation. This project is not presented as an audited production protocol.
+Arc's ERC-20 USDC interface and decimals are documented by [Arcscan](https://docs.arc-scan.org/docs/addresses). The address remains an explicit deployment environment variable rather than a hardcoded constructor parameter.
 
----
+## Install and test
 
-## How It Works
+Prerequisites: Foundry, Git, and Node.js 22+.
 
-### 1. Create a Task
+```powershell
+cd contracts
+forge install OpenZeppelin/openzeppelin-contracts foundry-rs/forge-std --no-commit
+forge fmt --check
+forge build
+forge test -vvv
+```
 
-A task creator publishes a task with a title, description, category, reward, deadline, and acceptance criteria.
+Install and run the frontend:
 
-Examples include:
+```powershell
+cd frontend
+npm install
+copy ..\.env.example .env.local
+# Set VITE_TASK_FORGE_ADDRESS after deployment
+npm run dev
+```
 
-* Fix a bug in an open-source repository.
-* Implement a new application feature.
-* Develop a Solidity smart contract.
-* Build a frontend interface.
-* Write technical documentation.
-* Create a developer tool or automation script.
+The interface does not show invented tasks: without `VITE_TASK_FORGE_ADDRESS`, it displays a configuration notice and makes no contract writes.
 
-### 2. Fund the Task
+## Deploy to Arc Testnet
 
-The creator deposits the specified USDC reward into the task's smart contract.
+1. Copy `.env.example` to `.env` at the repository root and set `PRIVATE_KEY`. Do not share or commit it.
+2. Fund the deployer with Arc testnet USDC from the faucet. Arc uses USDC for gas.
+3. From `contracts`, run:
 
-The contract records the task and its funded reward.
+```powershell
+$env:ARC_RPC_URL="https://rpc.testnet.arc.network"
+$env:PRIVATE_KEY="YOUR_PRIVATE_KEY"
+$env:USDC_ADDRESS="0x3600000000000000000000000000000000000000"
+forge script script/DeployTaskForge.s.sol:DeployTaskForge --rpc-url $env:ARC_RPC_URL --broadcast -vvvv
+```
 
-### 3. Complete the Work
+4. Record the deployed address and transaction hash in `deployments/arc-testnet.json` only after the transaction succeeds. Set `VITE_TASK_FORGE_ADDRESS` in `frontend/.env.local` to the address and rebuild.
 
-Contributors browse available tasks, select suitable work, and submit their deliverables.
+The script rejects every chain other than Arc Testnet. It never reads a private key from frontend configuration.
 
-Submissions can reference GitHub pull requests, repositories, documentation, or other relevant resources.
+## Publish the frontend
 
-### 4. Review the Submission
+1. Commit and push the repository to GitHub.
+2. In **Settings → Pages**, select **GitHub Actions** as the source.
+3. In **Settings → Secrets and variables → Actions → Variables**, set `VITE_TASK_FORGE_ADDRESS` to the deployed contract address.
+4. Push to `main` or run the **Deploy frontend to GitHub Pages** workflow.
 
-The task creator reviews the submitted work and decides whether it satisfies the task's acceptance criteria.
+The Vite base path is generated from GitHub's `GITHUB_REPOSITORY` value. The site will be available at `https://YOUR_GITHUB_USERNAME.github.io/YOUR_REPOSITORY_NAME/`.
 
-Task Forge does not assume that a URL or submission automatically proves that work is correct.
+## Repository layout
 
-### 5. Receive the Reward
+- `contracts/src/TaskForge.sol` — escrow marketplace contract.
+- `contracts/test/TaskForge.t.sol` — local unit/security tests using a mock USDC.
+- `contracts/script/DeployTaskForge.s.sol` — Arc-only deployment script.
+- `frontend/` — React/Vite/Wagmi interface.
+- `deployments/arc-testnet.json` — deployment record template; no fabricated deployment.
+- `.github/workflows/` — contract CI and GitHub Pages workflow.
 
-Once a submission is accepted, the smart contract establishes the contributor's reward entitlement.
+## Scope and limitations
 
-The contributor can then withdraw the eligible reward according to the contract's payment rules.
-
-**Important:** The actual behavior depends on the implemented contract and its task lifecycle. Cancellation, expiration, and refund rules must preserve any reward entitlement that has already been established.
-
----
-
-## Why Arc?
-
-Task Forge is built for Arc, an EVM-compatible blockchain designed around stablecoin-based financial applications.
-
-Arc provides an environment for exploring smart contracts, USDC payments, and blockchain-based application development.
-
-By building Task Forge on Arc, the project demonstrates how programmable financial infrastructure can support task coordination and transparent reward distribution.
-
-### Arc Testnet Resources
-
-* [Arc Official Website](https://www.arc.io/)
-* [Arc Documentation](https://docs.arc.network/)
-* [Arc Testnet Explorer](https://testnet.arcscan.app/)
-* [Arc Testnet RPC](https://rpc.testnet.arc.network)
-* [Circle Faucet](https://faucet.circle.com/)
-
-Verify the current network configuration and official testnet token addresses against the latest documentation before interacting with the application.
-
----
-
-## Arc Testnet Configuration
-
-The initial target configuration is:
-
-| Setting  | Value                             |
-| -------- | --------------------------------- |
-| Network  | Arc Testnet                       |
-| Chain ID | `5042002`                         |
-| RPC URL  | `https://rpc.testnet.arc.network` |
-| Explorer | `https://testnet.arcscan.app/`    |
-| Faucet   | `https://faucet.circle.com/`      |
-
-Confirm these values against the current official Arc documentation before deployment.
-
-### USDC Integration
-
-Task Forge uses the verified Arc Testnet ERC-20 USDC contract for task funding and reward payments.
-
-Do not assume that the native token used for gas is interchangeable with the ERC-20 contract used by the escrow.
-
-The token address and decimals must be verified before deployment.
-
-**Do not deploy the contracts with an unverified token address.**
-
----
-
-## Testing and Auditing
-
-The project should include Foundry tests for expected behavior and adversarial cases.
-
-Passing tests does not prove that a contract is free of vulnerabilities.
-
-Unless an independent audit has actually been completed and documented, Task Forge must not be represented as audited.
-
-Use testnet funds only.
-
-### Responsible Disclosure
-
-If you discover a security issue, avoid publicly disclosing exploitable details before the issue has been investigated and addressed.
-
-Report issues through the repository's GitHub Issues or another disclosure channel designated by the maintainers.
-
-Do not include private keys, credentials, or sensitive personal information in issue reports.
-
----
-
-## Acknowledgments
-
-Task Forge is built to explore the possibilities of Arc, Solidity, and programmable USDC payments.
-
-The project aims to make it easier to connect useful digital work with transparent, verifiable onchain rewards.
-
-**Task Forge — Build. Contribute. Earn.**
+Task descriptions and deliverable URLs are public blockchain data. Keep large files and sensitive information offchain. The MVP intentionally has no database or indexer; the frontend reads contract state directly and scans submissions for small task volumes. This is suitable for an MVP, not a high-volume production marketplace.

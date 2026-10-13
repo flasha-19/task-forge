@@ -1,0 +1,10 @@
+{
+  "chainId": 5042002,
+  "network": "Arc Testnet",
+  "usdc": "0x3600000000000000000000000000000000000000",
+  "usdcDecimals": 6,
+  "taskForge": null,
+  "deployTxHash": null,
+  "deployBlock": null,
+  "note": "Not deployed yet. Fill taskForge, deployTxHash and deployBlock after a successful deployment."
+}

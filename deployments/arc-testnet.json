@@ -3,8 +3,8 @@
   "network": "Arc Testnet",
   "usdc": "0x3600000000000000000000000000000000000000",
   "usdcDecimals": 6,
-  "taskForge": "0x8C187118DCFefbeb706D627cC8feF81FD2d43cA9",
-  "deployTxHash": "0x42fc23b2044227ada3faf7f8d24c52f176a73519d3cef543933871dc57995afc",
-  "deployBlock": 67038677,
-  "note": "TaskForge successfully deployed on Arc Testnet."
+  "taskForge": "0x4d9E90E5Eb79a0c47fD955D52D8C959c88966d4a",
+  "deployTxHash": "0xda59cf293a883179538237e661672e2b15bf6301565e536983be4b996a8919c9",
+  "deployBlock": 67151800,
+  "note": "TaskForge with submission rejection (minimum 15-word reason) deployed on Arc Testnet."
 }

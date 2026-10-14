@@ -2,12 +2,15 @@ import { useEffect, useMemo, useState } from "react";
 import { useAccount, useConnect, useDisconnect, useSwitchChain } from "wagmi";
 import type { Abi } from "viem";
 import { arcTestnet, EXPLORER, FAUCET_URL, TASKFORGE_ADDRESS, USDC_ADDRESS, addrUrl, txUrl } from "./config";
-import { taskForgeAbi } from "./abi";
+import { taskForgeAbiWithRejection as taskForgeAbi } from "./abi";
 import { erc20Abi } from "./erc20";
 import { useEvents, useSubmissions, useTask, useTasks, useTx, useUsdc, type TxState } from "./data";
 import { CATEGORIES, fmtDate, fmtUsdc, parseUsdc, safeUrl, sameAddr, short, statusLabel, type Task } from "./lib";
 
 const tf = (functionName: string, args: unknown[]) => ({ address: TASKFORGE_ADDRESS!, abi: taskForgeAbi as Abi, functionName, args });
+
+const countWords = (text: string) =>
+  text.trim().split(/\\s+/).filter(Boolean).length;
 
 function useHashRoute() {
   const [hash, setHash] = useState(window.location.hash || "#/");
@@ -219,6 +222,7 @@ function TaskDetail({ id }: { id: number }) {
   const { state, send, reset } = useTx();
   const [desc, setDesc] = useState("");
   const [url, setUrl] = useState("");
+  const [rejectionReasons, setRejectionReasons] = useState<Record<string, string>>({});
   const [formErr, setFormErr] = useState<string | null>(null);
   const busy = state.phase === "wallet" || state.phase === "pending";
 
@@ -281,11 +285,63 @@ function TaskDetail({ id }: { id: number }) {
             <div className="row between">
               <span>#{s.id.toString()} · {short(s.contributor)}{sameAddr(s.contributor, w.address) && " (you)"} · {fmtDate(s.createdAt)}</span>
               {accepted && <span className="badge accepted">Accepted</span>}
+              {s.rejected && <span className="badge cancelled">Rejected</span>}
             </div>
             <p className="pre">{s.description}</p>
             {link ? <a href={link} target="_blank" rel="noreferrer noopener">{link} ↗</a> : <span className="muted">Invalid URL</span>}
-            {isCreator && task.status === 0 && (
-              <div><button disabled={!w.canWrite || busy} onClick={() => send("Accept submission", tf("acceptSubmission", [BigInt(id), s.id]))}>Accept this submission</button></div>
+
+            {s.rejected && (
+              <div className="banner bad rejection-reason">
+                <strong>Submission rejected</strong>
+                <p>{s.rejectionReason}</p>
+              </div>
+            )}
+
+            {isCreator && task.status === 0 && !s.rejected && !accepted && (
+              <div className="submission-actions">
+                <button
+                  disabled={!w.canWrite || busy}
+                  onClick={() => send("Accept submission", tf("acceptSubmission", [BigInt(id), s.id]))}
+                >
+                  Accept this submission
+                </button>
+
+                <label>
+                  Reason for rejection (minimum 15 words)
+                  <textarea
+                    rows={3}
+                    value={rejectionReasons[s.id.toString()] ?? ""}
+                    onChange={(e) => setRejectionReasons((old) => ({
+                      ...old,
+                      [s.id.toString()]: e.target.value,
+                    }))}
+                    placeholder="Explain why this submission does not meet the task requirements."
+                  />
+                </label>
+
+                <p className="muted small">
+                  {countWords(rejectionReasons[s.id.toString()] ?? "")} / 15 words minimum
+                </p>
+
+                <button
+                  className="danger"
+                  disabled={
+                    !w.canWrite ||
+                    busy ||
+                    countWords(rejectionReasons[s.id.toString()] ?? "") < 15
+                  }
+                  onClick={() => send(
+                    "Reject submission",
+                    tf("rejectSubmission", [
+                      BigInt(id),
+                      s.id,
+                      (rejectionReasons[s.id.toString()] ?? "").trim(),
+                    ])
+                  )}
+                >
+                  Reject submission
+                </button>
+              </div>
             )}
           </div>
         );

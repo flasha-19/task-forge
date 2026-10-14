@@ -3,7 +3,7 @@ import { useAccount, usePublicClient, useWriteContract } from "wagmi";
 import { useCallback, useState } from "react";
 import type { Abi, Hash } from "viem";
 import { arcTestnet, DEPLOY_BLOCK, TASKFORGE_ADDRESS, USDC_ADDRESS } from "./config";
-import { taskForgeAbi } from "./abi";
+import { taskForgeAbiWithRejection as taskForgeAbi } from "./abi";
 import { erc20Abi } from "./erc20";
 import { errMsg, type Submission, type Task } from "./lib";
 
@@ -42,7 +42,29 @@ export function useSubmissions(taskId: number, count: number) {
     enabled: !!client && !!TASKFORGE_ADDRESS,
     queryFn: async (): Promise<Submission[]> => {
       const [ids, subs] = (await client!.readContract({ address: TASKFORGE_ADDRESS!, abi: taskForgeAbi, functionName: "getTaskSubmissions", args: [BigInt(taskId), 0n, 200n] })) as unknown as [bigint[], Omit<Submission, "id">[]];
-      return subs.map((s, i) => ({ ...s, id: ids[i] }));
+      return Promise.all(subs.map(async (s, i) => {
+        const [rejected, rejectionReason] = await Promise.all([
+          client!.readContract({
+            address: TASKFORGE_ADDRESS!,
+            abi: taskForgeAbi,
+            functionName: "submissionRejected",
+            args: [ids[i]],
+          }),
+          client!.readContract({
+            address: TASKFORGE_ADDRESS!,
+            abi: taskForgeAbi,
+            functionName: "submissionRejectionReason",
+            args: [ids[i]],
+          }),
+        ]);
+
+        return {
+          ...s,
+          id: ids[i],
+          rejected: Boolean(rejected),
+          rejectionReason: String(rejectionReason),
+        };
+      }));
     },
   });
 }

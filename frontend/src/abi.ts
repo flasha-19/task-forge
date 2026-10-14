@@ -837,3 +837,116 @@ export const taskForgeAbi = [
     "inputs": []
   }
 ] as const;
+
+
+// ABI entries for submission rejection.
+export const submissionRejectionAbi = [
+  {
+    "type": "function",
+    "name": "rejectSubmission",
+    "inputs": [
+      {
+        "name": "taskId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "submissionId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "reason",
+        "type": "string",
+        "internalType": "string"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "submissionRejected",
+    "inputs": [
+      {
+        "name": "submissionId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "submissionRejectionReason",
+    "inputs": [
+      {
+        "name": "submissionId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "string",
+        "internalType": "string"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "event",
+    "name": "SubmissionRejected",
+    "inputs": [
+      {
+        "name": "taskId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "submissionId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "contributor",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "reason",
+        "type": "string",
+        "indexed": false,
+        "internalType": "string"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "error",
+    "name": "RejectionReasonTooShort",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "SubmissionAlreadyRejected",
+    "inputs": []
+  }
+] as const;
+
+
+export const taskForgeAbiWithRejection = [
+  ...taskForgeAbi,
+  ...submissionRejectionAbi,
+] as const;

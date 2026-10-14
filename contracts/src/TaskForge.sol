@@ -68,6 +68,8 @@ contract TaskForge is ReentrancyGuard {
     Submission[] private _submissions; // submission id = index (global)
     mapping(uint256 taskId => uint256[] ids) private _taskSubmissionIds;
     mapping(uint256 taskId => mapping(address who => bool)) public hasSubmitted;
+    mapping(uint256 submissionId => bool) public submissionRejected;
+    mapping(uint256 submissionId => string) public submissionRejectionReason;
 
     /// @notice Sum of rewards for tasks in Open or Accepted state. Always <= token balance.
     uint256 public totalEscrowed;
@@ -89,6 +91,12 @@ contract TaskForge is ReentrancyGuard {
     event SubmissionAccepted(
         uint256 indexed taskId, uint256 indexed submissionId, address indexed contributor
     );
+    event SubmissionRejected(
+        uint256 indexed taskId,
+        uint256 indexed submissionId,
+        address indexed contributor,
+        string reason
+    );
     event RewardWithdrawn(uint256 indexed taskId, address indexed contributor, uint256 amount);
     event TaskCancelled(uint256 indexed taskId, address indexed creator, uint256 refund);
 
@@ -109,6 +117,8 @@ contract TaskForge is ReentrancyGuard {
     error AlreadySubmitted();
     error SubmissionTaskMismatch();
     error CancelNotAllowed();
+    error SubmissionAlreadyRejected();
+    error RejectionReasonTooShort();
 
     constructor(IERC20 token_) {
         if (address(token_) == address(0)) revert ZeroAddress();
@@ -201,12 +211,53 @@ contract TaskForge is ReentrancyGuard {
         if (submissionId >= _submissions.length) revert SubmissionNotFound();
         Submission storage s = _submissions[submissionId];
         if (s.taskId != taskId) revert SubmissionTaskMismatch();
+        if (submissionRejected[submissionId]) revert SubmissionAlreadyRejected();
 
         t.status = Status.Accepted;
         t.acceptedSubmissionId = submissionId;
         t.contributor = s.contributor;
 
         emit SubmissionAccepted(taskId, submissionId, s.contributor);
+    }
+
+    /// @notice Creator rejects a submission with a reason of at least 15 words.
+    function rejectSubmission(
+        uint256 taskId,
+        uint256 submissionId,
+        string calldata reason
+    ) external {
+        Task storage t = _task(taskId);
+        if (msg.sender != t.creator) revert NotCreator();
+        if (t.status != Status.Open) revert InvalidStatus(t.status);
+        if (submissionId >= _submissions.length) revert SubmissionNotFound();
+
+        Submission storage s = _submissions[submissionId];
+        if (s.taskId != taskId) revert SubmissionTaskMismatch();
+        if (submissionRejected[submissionId]) revert SubmissionAlreadyRejected();
+        if (_wordCount(reason) < 15) revert RejectionReasonTooShort();
+
+        submissionRejected[submissionId] = true;
+        submissionRejectionReason[submissionId] = reason;
+
+        emit SubmissionRejected(taskId, submissionId, s.contributor, reason);
+    }
+
+    function _wordCount(string calldata text_) private pure returns (uint256 count) {
+        bytes memory data = bytes(text_);
+        bool inWord;
+
+        for (uint256 i = 0; i < data.length; i++) {
+            bytes1 c = data[i];
+            bool whitespace =
+                c == 0x20 || c == 0x09 || c == 0x0a || c == 0x0d;
+
+            if (whitespace) {
+                inWord = false;
+            } else if (!inWord) {
+                count++;
+                inWord = true;
+            }
+        }
     }
 
     /// @notice Accepted contributor pulls the reward. Pays exactly once.

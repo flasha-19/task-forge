@@ -657,4 +657,44 @@ contract TaskForgeTest is Test {
         assertGe(usdc.balanceOf(address(forge_)), forge_.totalEscrowed());
         assertEq(usdc.balanceOf(alice), r2);
     }
+
+    function test_RejectSubmission_StoresReasonAndLeavesTaskOpen() public {
+        uint256 id = _create();
+        uint256 sid = _submit(alice, id);
+
+        string memory reason =
+            "This submission does not meet the task requirements because key requested functionality is missing and tests are not included.";
+
+        vm.prank(creator);
+        forge_.rejectSubmission(id, sid, reason);
+
+        assertTrue(forge_.submissionRejected(sid));
+        assertEq(forge_.submissionRejectionReason(sid), reason);
+    }
+
+    function test_RejectSubmission_RequiresAtLeast15Words() public {
+        uint256 id = _create();
+        uint256 sid = _submit(alice, id);
+
+        vm.expectRevert(TaskForge.RejectionReasonTooShort.selector);
+        vm.prank(creator);
+        forge_.rejectSubmission(
+            id,
+            sid,
+            "This reason has only seven words total"
+        );
+    }
+
+    function test_RejectSubmission_Unauthorized() public {
+        uint256 id = _create();
+        uint256 sid = _submit(alice, id);
+
+        string memory reason =
+            "This submission misses the required deliverable and does not demonstrate that the requested task has been completed.";
+
+        vm.expectRevert(TaskForge.NotCreator.selector);
+        vm.prank(alice);
+        forge_.rejectSubmission(id, sid, reason);
+    }
+
 }

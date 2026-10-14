@@ -17,7 +17,7 @@ export type Task = {
   title: string;
   description: string;
 };
-export type Submission = { id: bigint; taskId: bigint; contributor: `0x${string}`; createdAt: bigint; description: string; url: string };
+export type Submission = { id: bigint; taskId: bigint; contributor: `0x${string}`; createdAt: bigint; description: string; url: string; rejected: boolean; rejectionReason: string };
 
 export const fmtUsdc = (v: bigint) => Number(formatUnits(v, USDC_DECIMALS)).toLocaleString(undefined, { maximumFractionDigits: 6 });
 export const parseUsdc = (s: string) => parseUnits(s.trim(), USDC_DECIMALS);

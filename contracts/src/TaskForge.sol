@@ -221,11 +221,9 @@ contract TaskForge is ReentrancyGuard {
     }
 
     /// @notice Creator rejects a submission with a reason of at least 15 words.
-    function rejectSubmission(
-        uint256 taskId,
-        uint256 submissionId,
-        string calldata reason
-    ) external {
+    function rejectSubmission(uint256 taskId, uint256 submissionId, string calldata reason)
+        external
+    {
         Task storage t = _task(taskId);
         if (msg.sender != t.creator) revert NotCreator();
         if (t.status != Status.Open) revert InvalidStatus(t.status);
@@ -248,8 +246,7 @@ contract TaskForge is ReentrancyGuard {
 
         for (uint256 i = 0; i < data.length; i++) {
             bytes1 c = data[i];
-            bool whitespace =
-                c == 0x20 || c == 0x09 || c == 0x0a || c == 0x0d;
+            bool whitespace = c == 0x20 || c == 0x09 || c == 0x0a || c == 0x0d;
 
             if (whitespace) {
                 inWord = false;

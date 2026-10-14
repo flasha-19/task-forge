@@ -678,11 +678,7 @@ contract TaskForgeTest is Test {
 
         vm.expectRevert(TaskForge.RejectionReasonTooShort.selector);
         vm.prank(creator);
-        forge_.rejectSubmission(
-            id,
-            sid,
-            "This reason has only seven words total"
-        );
+        forge_.rejectSubmission(id, sid, "This reason has only seven words total");
     }
 
     function test_RejectSubmission_Unauthorized() public {
@@ -696,5 +692,4 @@ contract TaskForgeTest is Test {
         vm.prank(alice);
         forge_.rejectSubmission(id, sid, reason);
     }
-
 }

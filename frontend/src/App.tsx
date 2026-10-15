@@ -10,7 +10,7 @@ import { CATEGORIES, fmtDate, fmtUsdc, parseUsdc, safeUrl, sameAddr, short, stat
 const tf = (functionName: string, args: unknown[]) => ({ address: TASKFORGE_ADDRESS!, abi: taskForgeAbi as Abi, functionName, args });
 
 const countWords = (text: string) =>
-  text.trim().split(/\\s+/).filter(Boolean).length;
+  text.trim().split(/\s+/).filter(Boolean).length;
 
 function useHashRoute() {
   const [hash, setHash] = useState(window.location.hash || "#/");

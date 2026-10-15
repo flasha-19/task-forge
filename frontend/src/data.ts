@@ -41,22 +41,35 @@ export function useSubmissions(taskId: number, count: number) {
     queryKey: ["subs", TASKFORGE_ADDRESS, taskId, count],
     enabled: !!client && !!TASKFORGE_ADDRESS,
     queryFn: async (): Promise<Submission[]> => {
-      const [ids, subs] = (await client!.readContract({ address: TASKFORGE_ADDRESS!, abi: taskForgeAbi, functionName: "getTaskSubmissions", args: [BigInt(taskId), 0n, 200n] })) as unknown as [bigint[], Omit<Submission, "id">[]];
+      const addr = TASKFORGE_ADDRESS!;
+      const [ids, subs] = (await client!.readContract({ address: addr, abi: taskForgeAbi, functionName: "getTaskSubmissions", args: [BigInt(taskId), 0n, 200n] })) as unknown as [bigint[], Omit<Submission, "id">[]];
+
+      // Deployments predating submission rejection don't expose these getters, so calling them
+      // reverts. Probe once, then degrade gracefully: rejection metadata missing must never
+      // hide the submissions themselves (the UI would otherwise claim "No submissions yet").
+      let supportsRejection = false;
+      if (ids.length > 0) {
+        try {
+          await client!.readContract({ address: addr, abi: taskForgeAbi, functionName: "submissionRejected", args: [ids[0]] });
+          supportsRejection = true;
+        } catch {
+          supportsRejection = false;
+        }
+      }
+
       return Promise.all(subs.map(async (s, i) => {
-        const [rejected, rejectionReason] = await Promise.all([
-          client!.readContract({
-            address: TASKFORGE_ADDRESS!,
-            abi: taskForgeAbi,
-            functionName: "submissionRejected",
-            args: [ids[i]],
-          }),
-          client!.readContract({
-            address: TASKFORGE_ADDRESS!,
-            abi: taskForgeAbi,
-            functionName: "submissionRejectionReason",
-            args: [ids[i]],
-          }),
-        ]);
+        let rejected = false;
+        let rejectionReason = "";
+        if (supportsRejection) {
+          try {
+            [rejected, rejectionReason] = await Promise.all([
+              client!.readContract({ address: addr, abi: taskForgeAbi, functionName: "submissionRejected", args: [ids[i]] }),
+              client!.readContract({ address: addr, abi: taskForgeAbi, functionName: "submissionRejectionReason", args: [ids[i]] }),
+            ]);
+          } catch {
+            // Keep the submission visible; only its rejection metadata is unavailable.
+          }
+        }
 
         return {
           ...s,

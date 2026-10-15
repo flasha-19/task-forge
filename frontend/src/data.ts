@@ -82,6 +82,27 @@ export function useSubmissions(taskId: number, count: number) {
   });
 }
 
+/**
+ * Probes whether the configured deployment supports submission rejection (added after the first
+ * deployment). Older contracts revert when the getter is called, so the UI hides the reject
+ * controls instead of sending transactions that are guaranteed to fail.
+ */
+export function useRejectionSupport() {
+  const client = usePublicClient({ chainId: arcTestnet.id });
+  return useQuery({
+    queryKey: ["rejectionSupport", TASKFORGE_ADDRESS],
+    enabled: !!client && !!TASKFORGE_ADDRESS,
+    queryFn: async (): Promise<boolean> => {
+      try {
+        await client!.readContract({ address: TASKFORGE_ADDRESS!, abi: taskForgeAbi, functionName: "submissionRejected", args: [0n] });
+        return true;
+      } catch {
+        return false;
+      }
+    },
+  });
+}
+
 export type EventRow = { name: string; taskId: bigint; submissionId?: bigint; account?: `0x${string}`; amount?: bigint; txHash: Hash; block: bigint };
 
 /** All TaskForge events since the configured deploy block — source of tx hashes and activity history. */

@@ -4,7 +4,7 @@ import type { Abi } from "viem";
 import { arcTestnet, EXPLORER, FAUCET_URL, TASKFORGE_ADDRESS, USDC_ADDRESS, addrUrl, txUrl } from "./config";
 import { taskForgeAbiWithRejection as taskForgeAbi } from "./abi";
 import { erc20Abi } from "./erc20";
-import { useEvents, useSubmissions, useTask, useTasks, useTx, useUsdc, type TxState } from "./data";
+import { useEvents, useRejectionSupport, useSubmissions, useTask, useTasks, useTx, useUsdc, type TxState } from "./data";
 import { CATEGORIES, fmtDate, fmtUsdc, parseUsdc, safeUrl, sameAddr, short, statusLabel, type Task } from "./lib";
 
 const tf = (functionName: string, args: unknown[]) => ({ address: TASKFORGE_ADDRESS!, abi: taskForgeAbi as Abi, functionName, args });
@@ -218,6 +218,7 @@ function TaskDetail({ id }: { id: number }) {
   const w = useWallet();
   const { task, isLoading } = useTask(id);
   const { data: subs } = useSubmissions(id, task?.submissionCount ?? 0);
+  const { data: rejectionSupported } = useRejectionSupport();
   const { data: events } = useEvents();
   const { state, send, reset } = useTx();
   const [desc, setDesc] = useState("");
@@ -276,6 +277,11 @@ function TaskDetail({ id }: { id: number }) {
       )}
 
       <h2>Submissions</h2>
+      {rejectionSupported === false && (
+        <p className="muted small">
+          This TaskForge contract was deployed before submission rejection was added, so submissions can only be accepted.
+        </p>
+      )}
       {!subs?.length && <p className="muted">No submissions yet.</p>}
       {subs?.map((s) => {
         const link = safeUrl(s.url);
@@ -306,41 +312,45 @@ function TaskDetail({ id }: { id: number }) {
                   Accept this submission
                 </button>
 
-                <label>
-                  Reason for rejection (minimum 15 words)
-                  <textarea
-                    rows={3}
-                    value={rejectionReasons[s.id.toString()] ?? ""}
-                    onChange={(e) => setRejectionReasons((old) => ({
-                      ...old,
-                      [s.id.toString()]: e.target.value,
-                    }))}
-                    placeholder="Explain why this submission does not meet the task requirements."
-                  />
-                </label>
+                {rejectionSupported && (
+                  <>
+                    <label>
+                      Reason for rejection (minimum 15 words)
+                      <textarea
+                        rows={3}
+                        value={rejectionReasons[s.id.toString()] ?? ""}
+                        onChange={(e) => setRejectionReasons((old) => ({
+                          ...old,
+                          [s.id.toString()]: e.target.value,
+                        }))}
+                        placeholder="Explain why this submission does not meet the task requirements."
+                      />
+                    </label>
 
-                <p className="muted small">
-                  {countWords(rejectionReasons[s.id.toString()] ?? "")} / 15 words minimum
-                </p>
+                    <p className="muted small">
+                      {countWords(rejectionReasons[s.id.toString()] ?? "")} / 15 words minimum
+                    </p>
 
-                <button
-                  className="danger"
-                  disabled={
-                    !w.canWrite ||
-                    busy ||
-                    countWords(rejectionReasons[s.id.toString()] ?? "") < 15
-                  }
-                  onClick={() => send(
-                    "Reject submission",
-                    tf("rejectSubmission", [
-                      BigInt(id),
-                      s.id,
-                      (rejectionReasons[s.id.toString()] ?? "").trim(),
-                    ])
-                  )}
-                >
-                  Reject submission
-                </button>
+                    <button
+                      className="danger"
+                      disabled={
+                        !w.canWrite ||
+                        busy ||
+                        countWords(rejectionReasons[s.id.toString()] ?? "") < 15
+                      }
+                      onClick={() => send(
+                        "Reject submission",
+                        tf("rejectSubmission", [
+                          BigInt(id),
+                          s.id,
+                          (rejectionReasons[s.id.toString()] ?? "").trim(),
+                        ])
+                      )}
+                    >
+                      Reject submission
+                    </button>
+                  </>
+                )}
               </div>
             )}
           </div>
